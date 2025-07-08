@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-container
+        image: registry.cn-shenzhen.aliyuncs.com/vvlisn/nginx:latest
+        env:
+        - name: vestack_varlog
+          value: /var/log/app.log
+        - name: vestack_varlog
+          value: /var/log/err.log
+        - name: vestack_varlog
+          value: /var/log/debug.log
+        - name: vestack_varlog
+          value: /var/log/war.log

@@ -1,0 +1,9 @@
+{
+  "env_key": "LOG_PATHS",
+  "annotation_base": "co.elastic.logs/path",
+  "annotation_ext_format": "co_elastic_logs_path_ext_%d",
+  "additional_annotations": {
+    "example.com/key1": "value1",
+    "example.com/key2": "value2"
+  }
+}

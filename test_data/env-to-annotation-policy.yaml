@@ -1,0 +1,22 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: env-to-annotation-policy
+spec:
+  module: registry://ghcr.io/vvlisn/policies/env-to-annotation-policy:latest
+  rules:
+  - apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments"]
+    operations:
+    - CREATE
+    - UPDATE
+  mutating: true
+  settings:
+    env_key: vestack_varlog
+    annotation_base: co_elastic_logs_path
+    annotation_ext_format: co_elastic_logs_path_ext_%d
+    additional_annotations:
+      co_elastic_logs_multiline_pattern: '^[[:space:]]+(at|\.{3})[[:space:]]+\b|^Caused by:'
+      co_elastic_logs_multiline_negate: false
+      co_elastic_logs_multiline_match: after
