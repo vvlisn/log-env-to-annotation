@@ -118,7 +118,7 @@ func TestPodMutation(t *testing.T) {
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"co_elastic_logs_path": "/var/log/app1.log", // 只处理第一个容器
+				"co_elastic_logs_path": "/var/log/app1.log",
 			},
 			shouldMutate: true,
 		},
@@ -165,8 +165,10 @@ func TestPodMutation(t *testing.T) {
 					},
 				},
 			},
-			expectedAnnotations: map[string]string{}, // No mutation expected, so empty map
-			shouldMutate:        false,
+			expectedAnnotations: map[string]string{
+				"co.elastic.logs/enabled": "true",
+			},
+			shouldMutate: true,
 		},
 		{
 			name: "pod with existing annotations",
@@ -242,8 +244,10 @@ func TestPodMutation(t *testing.T) {
 					Containers: []*corev1.Container{},
 				},
 			},
-			expectedAnnotations: map[string]string{},
-			shouldMutate:        false,
+			expectedAnnotations: map[string]string{
+				"co.elastic.logs/enabled": "true",
+			},
+			shouldMutate: true,
 		},
 	}
 
@@ -389,7 +393,8 @@ func assertNoMutation(t *testing.T, response *kubewarden_protocol.ValidationResp
 	t.Helper()
 
 	if response.MutatedObject != nil {
-		t.Errorf("Expected no mutation but got one")
+		mutatedJSON, _ := json.MarshalIndent(response.MutatedObject, "", "  ")
+		t.Errorf("Expected no mutation but got one:\n%s", string(mutatedJSON))
 	}
 }
 

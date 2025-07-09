@@ -1,13 +1,13 @@
 apiVersion: policies.kubewarden.io/v1
 kind: ClusterAdmissionPolicy
 metadata:
-  name: env-to-annotation-policy
+  name: log-env-to-annotation
 spec:
-  module: registry://ghcr.io/vvlisn/policies/env-to-annotation-policy:latest
+  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:v1.0.0
   rules:
-  - apiGroups: ["apps"]
+  - apiGroups: [""]
     apiVersions: ["v1"]
-    resources: ["deployments"]
+    resources: ["pods"]
     operations:
     - CREATE
     - UPDATE

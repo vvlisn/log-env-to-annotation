@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-@test "Pod with no target env variable is accepted and not mutated" {
+@test "Pod with no target env variable is mutated with default annotation" {
   run kwctl run \
     -r "test_data/pod-no-env.json" \
     --settings-json '{ "env_key": "vestack_varlog", "annotation_base": "co_elastic_logs_path", "annotation_ext_format": "co_elastic_logs_path_ext_%d" }' \
@@ -8,7 +8,12 @@
 
   [ "$status" -eq 0 ]
   [[ "$output" == *'"allowed":true'* ]]
-  [[ "$output" != *'"patch"'* ]]
+  [[ "$output" == *'"patch"'* ]]
+  patch_b64=$(echo "$output" | tail -n 1 | jq -r '.patch')
+  patch_decoded=$(echo "$patch_b64" | base64 --decode)
+  echo "Decoded Patch (No Env): $patch_decoded"
+  echo "$patch_decoded" | jq -e '.[] | select(.op == "add" and .path == "/metadata/annotations" and .value["co.elastic.logs/enabled"] == "true")'
+  [ $? -eq 0 ]
 }
 
 
@@ -138,4 +143,3 @@
     ]' 
   [ $? -eq 0 ]
 }
-

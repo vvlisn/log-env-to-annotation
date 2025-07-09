@@ -49,7 +49,6 @@ func processPod(req kubewarden_protocol.ValidationRequest, settings Settings) ([
 }
 
 func mutatePodContainers(pod *corev1.Pod, settings Settings) bool {
-	mutated := false
 	if pod.Metadata == nil {
 		pod.Metadata = &metav1.ObjectMeta{}
 	}
@@ -57,31 +56,36 @@ func mutatePodContainers(pod *corev1.Pod, settings Settings) bool {
 		pod.Metadata.Annotations = map[string]string{}
 	}
 
-	if len(pod.Spec.Containers) > 0 {
-		if processContainerEnv(
-			pod.Spec.Containers[0],
-			pod.Metadata.Annotations,
-			settings,
-		) {
-			mutated = true
-		}
+	// If there are no containers, add the default annotation and return.
+	if len(pod.Spec.Containers) == 0 {
+		pod.Metadata.Annotations["co.elastic.logs/enabled"] = "true"
+		return true
 	}
 
-	// 添加自定义注解的条件判断
+	container := pod.Spec.Containers[0]
 	envExists := false
-	if len(pod.Spec.Containers) > 0 {
-		for _, env := range pod.Spec.Containers[0].Env {
-			if env != nil && env.Name != nil && *env.Name == settings.EnvKey {
-				envExists = true
-				break
-			}
+	for _, env := range container.Env {
+		if env != nil && env.Name != nil && *env.Name == settings.EnvKey {
+			envExists = true
+			break
 		}
 	}
 
-	if envExists && settings.AdditionalAnnotations != nil {
+	if !envExists {
+		pod.Metadata.Annotations["co.elastic.logs/enabled"] = "true"
+		return true
+	}
+
+	// envExists is true, so we proceed with the original logic for the first container
+	mutated := processContainerEnv(
+		container,
+		pod.Metadata.Annotations,
+		settings,
+	)
+
+	if settings.AdditionalAnnotations != nil {
 		for key, value := range settings.AdditionalAnnotations {
 			if value != nil {
-				// 调用类型转换函数
 				strValue := convertToString(value)
 				pod.Metadata.Annotations[key] = strValue
 				mutated = true
