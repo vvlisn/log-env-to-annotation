@@ -23,4 +23,4 @@ annotations:
   io.kubewarden.policy.license: Apache-2.0
   io.kubewarden.policy.severity: medium
   io.kubewarden.policy.category: Other
-  io.kubewarden.policy.version: "0.0.1"
+  io.kubewarden.policy.version: "1.0.0"
