@@ -129,9 +129,9 @@ Here's how to deploy this policy as a ClusterAdmissionPolicy in Kubernetes:
 apiVersion: policies.kubewarden.io/v1
 kind: ClusterAdmissionPolicy
 metadata:
-  name: env-to-annotation-policy
+  name: log-env-to-annotation
 spec:
-  module: registry://ghcr.io/vvlisn/policies/env-to-annotation-policy:latest
+  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:latest
   rules:
   - apiGroups: [""]
     apiVersions: ["v1"]

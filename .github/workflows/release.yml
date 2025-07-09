@@ -24,4 +24,4 @@ jobs:
 
     uses: kubewarden/github-actions/.github/workflows/reusable-release-policy-go.yml@7195340a122321bf547fda2ffc07eed6f6ae43f6 # v4.5.1
     with:
-      oci-target: ghcr.io/${{ github.repository_owner }}/policies/env-to-annotation-policy
+      oci-target: ghcr.io/${{ github.repository_owner }}/policies/log-env-to-annotation
