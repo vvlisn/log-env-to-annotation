@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	corev1 "github.com/kubewarden/k8s-objects/api/core/v1"
@@ -376,9 +375,9 @@ func TestObjectIntegrity(t *testing.T) {
 		Settings: mustMarshalJSON(settings),
 	}
 
-	response, err := validateTest(t, request)
-	if err != nil {
-		t.Fatalf("Validation failed: %v", err)
+	response, validateErr := validateTest(t, request)
+	if validateErr != nil {
+		t.Fatalf("Validation failed: %v", validateErr)
 	}
 
 	if !response.Accepted {
@@ -396,79 +395,107 @@ func TestObjectIntegrity(t *testing.T) {
 	mutatedJSON := mustMarshalJSON(response.MutatedObject)
 
 	var original, mutated map[string]interface{}
-	if err := json.Unmarshal(originalJSON, &original); err != nil {
-		t.Fatalf("Failed to unmarshal original object: %v", err)
+	if unmarshalErr1 := json.Unmarshal(originalJSON, &original); unmarshalErr1 != nil {
+		t.Fatalf("Failed to unmarshal original object: %v", unmarshalErr1)
 	}
-	if err := json.Unmarshal(mutatedJSON, &mutated); err != nil {
-		t.Fatalf("Failed to unmarshal mutated object: %v", err)
+	if unmarshalErr2 := json.Unmarshal(mutatedJSON, &mutated); unmarshalErr2 != nil {
+		t.Fatalf("Failed to unmarshal mutated object: %v", unmarshalErr2)
 	}
 
 	// 验证除了注解之外的所有字段都保持不变
 	assertObjectsEqual(t, original, mutated, []string{"metadata", "metadata.annotations"})
 }
 
-// assertObjectsEqual 递归比较两个对象，忽略指定的路径
+// assertObjectsEqual recursively compares two objects, ignoring specified paths.
 func assertObjectsEqual(t *testing.T, original, mutated map[string]interface{}, ignorePaths []string) {
 	t.Helper()
+	compareObjects(t, "", original, mutated, ignorePaths)
+}
 
+// compareObjects compares two objects at a specific path.
+func compareObjects(t *testing.T, path string, original, mutated map[string]interface{}, ignorePaths []string) {
+	t.Helper()
+
+	// Check for removed or changed fields
 	for key, originalValue := range original {
-		// 跳过被忽略的路径
-		if contains(ignorePaths, key) {
+		currentPath := joinPath(path, key)
+		if contains(ignorePaths, currentPath) || contains(ignorePaths, key) {
 			continue
 		}
 
 		mutatedValue, exists := mutated[key]
 		if !exists {
-			t.Errorf("Field %s was removed", key)
+			t.Errorf("Field %s was removed", currentPath)
 			continue
 		}
 
-		switch v := originalValue.(type) {
-		case map[string]interface{}:
-			if mv, ok := mutatedValue.(map[string]interface{}); ok {
-				// 构建新的忽略路径
-				newIgnorePaths := make([]string, 0)
-				for _, path := range ignorePaths {
-					if strings.HasPrefix(path, key+".") {
-						newPath := strings.TrimPrefix(path, key+".")
-						newIgnorePaths = append(newIgnorePaths, newPath)
-					}
-				}
-				assertObjectsEqual(t, v, mv, newIgnorePaths)
-			} else {
-				t.Errorf("Field %s type changed from map to %T", key, mutatedValue)
-			}
-		case []interface{}:
-			if mv, ok := mutatedValue.([]interface{}); ok {
-				if len(v) != len(mv) {
-					t.Errorf("Field %s array length changed from %d to %d", key, len(v), len(mv))
-				} else {
-					for i := range v {
-						if vm1, ok1 := v[i].(map[string]interface{}); ok1 {
-							if vm2, ok2 := mv[i].(map[string]interface{}); ok2 {
-								assertObjectsEqual(t, vm1, vm2, ignorePaths)
-							}
-						} else if v[i] != mv[i] {
-							t.Errorf("Field %s[%d] value changed from %v to %v", key, i, v[i], mv[i])
-						}
-					}
-				}
-			} else {
-				t.Errorf("Field %s type changed from array to %T", key, mutatedValue)
-			}
-		default:
-			if originalValue != mutatedValue {
-				t.Errorf("Field %s value changed from %v to %v", key, originalValue, mutatedValue)
-			}
-		}
+		compareValues(t, currentPath, originalValue, mutatedValue, ignorePaths)
 	}
 
-	// 检查是否添加了新字段
+	// Check for added fields
 	for key := range mutated {
-		if _, exists := original[key]; !exists && !contains(ignorePaths, key) {
-			t.Errorf("Unexpected field added: %s", key)
+		currentPath := joinPath(path, key)
+		if _, exists := original[key]; !exists && !contains(ignorePaths, currentPath) && !contains(ignorePaths, key) {
+			t.Errorf("Unexpected field added: %s", currentPath)
 		}
 	}
+}
+
+// compareValues compares two values of any type at a specific path.
+func compareValues(t *testing.T, path string, original, mutated interface{}, ignorePaths []string) {
+	t.Helper()
+
+	switch originalValue := original.(type) {
+	case map[string]interface{}:
+		mutatedMap, ok := mutated.(map[string]interface{})
+		if !ok {
+			t.Errorf("Field %s type changed from map to %T", path, mutated)
+			return
+		}
+		compareObjects(t, path, originalValue, mutatedMap, ignorePaths)
+
+	case []interface{}:
+		mutatedArray, ok := mutated.([]interface{})
+		if !ok {
+			t.Errorf("Field %s type changed from array to %T", path, mutated)
+			return
+		}
+		compareArrays(t, path, originalValue, mutatedArray, ignorePaths)
+
+	default:
+		if original != mutated {
+			t.Errorf("Field %s value changed from %v to %v", path, original, mutated)
+		}
+	}
+}
+
+// compareArrays compares two arrays at a specific path.
+func compareArrays(t *testing.T, path string, original, mutated []interface{}, ignorePaths []string) {
+	t.Helper()
+
+	if len(original) != len(mutated) {
+		t.Errorf("Field %s array length changed from %d to %d", path, len(original), len(mutated))
+		return
+	}
+
+	for i := range original {
+		originalMap, isMap1 := original[i].(map[string]interface{})
+		mutatedMap, isMap2 := mutated[i].(map[string]interface{})
+
+		if isMap1 && isMap2 {
+			compareObjects(t, joinPath(path, "["+string(rune('0'+i))+"]"), originalMap, mutatedMap, ignorePaths)
+		} else if original[i] != mutated[i] {
+			t.Errorf("Field %s[%d] value changed from %v to %v", path, i, original[i], mutated[i])
+		}
+	}
+}
+
+// joinPath joins path components with dots.
+func joinPath(base, key string) string {
+	if base == "" {
+		return key
+	}
+	return base + "." + key
 }
 
 func contains(slice []string, str string) bool {
@@ -536,27 +563,28 @@ func assertMutation(
 		t.Fatalf("Failed to unmarshal mutated object: %v", err)
 	}
 
-	// 验证注解
-	metadata, ok := mutatedPod["metadata"].(map[string]interface{})
-	if !ok {
+	// Verify annotations
+	metadata, hasMetadata := mutatedPod["metadata"].(map[string]interface{})
+	if !hasMetadata {
 		t.Error("Expected metadata in mutated pod")
 		return
 	}
 
-	annotations, ok := metadata["annotations"].(map[string]interface{})
-	if !ok {
+	annotations, hasAnnotations := metadata["annotations"].(map[string]interface{})
+	if !hasAnnotations {
 		t.Error("Expected annotations in mutated pod")
 		return
 	}
 
 	for key, expectedValue := range expectedAnnotations {
-		if actualValue, ok := annotations[key].(string); !ok || actualValue != expectedValue {
+		actualValue, hasValue := annotations[key].(string)
+		if !hasValue || actualValue != expectedValue {
 			t.Errorf("Expected annotation %s to be %s, got %v",
 				key, expectedValue, annotations[key])
 		}
 	}
 
-	// 检查是否有意外的注解
+	// Check for unexpected annotations
 	for key := range annotations {
 		if _, expected := expectedAnnotations[key]; !expected {
 			t.Errorf("Unexpected annotation found: %s", key)
