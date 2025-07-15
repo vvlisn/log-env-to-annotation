@@ -11,23 +11,6 @@ rules:
     resources:
       - "deployments"
       - "replicasets"
-      - "statefulsets"
-      - "daemonsets"
-    operations:
-      - CREATE
-      - UPDATE
-  - apiGroups: ["batch"]
-    apiVersions: ["v1"]
-    resources:
-      - "jobs"
-      - "cronjobs"
-    operations:
-      - CREATE
-      - UPDATE
-  - apiGroups: [""]
-    apiVersions: ["v1"]
-    resources:
-      - "replicationcontrollers"
     operations:
       - CREATE
       - UPDATE
@@ -37,15 +20,15 @@ executionMode: kubewarden-wapc
 backgroundAudit: false
 annotations:
   io.artifacthub.displayName: Log Env to Annotation Policy
-  io.artifacthub.resources: Pod
-  io.artifacthub.keywords: env, annotation, kubernetes, kubewarden, pod
+  io.artifacthub.resources: Pod,Deployment
+  io.artifacthub.keywords: env, annotation, kubernetes, kubewarden, pod, deployment, logging
   io.kubewarden.policy.ociUrl: ghcr.io/vvlisn/policies/log-env-to-annotation
   io.kubewarden.policy.title: log-env-to-annotation
-  io.kubewarden.policy.description: A policy that converts specific container environment variables into pod annotations.
+  io.kubewarden.policy.description: A policy that converts container environment variables into pod annotations for Deployments and their Pods, facilitating log collection with tools like Filebeat.
   io.kubewarden.policy.author: "vvlisn <vvlisn719@gmail.com>"
   io.kubewarden.policy.url: https://github.com/vvlisn/log-env-to-annotation
   io.kubewarden.policy.source: https://github.com/vvlisn/log-env-to-annotation
   io.kubewarden.policy.license: Apache-2.0
   io.kubewarden.policy.severity: medium
-  io.kubewarden.policy.category: Other
-  io.kubewarden.policy.version: "1.0.1"
+  io.kubewarden.policy.category: Logging
+  io.kubewarden.policy.version: "1.1.0"
