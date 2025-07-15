@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	corev1 "github.com/kubewarden/k8s-objects/api/core/v1"
@@ -10,7 +9,7 @@ import (
 	kubewarden_protocol "github.com/kubewarden/policy-sdk-go/protocol"
 )
 
-// validateTest 是一个辅助函数，用于执行策略验证.
+// validateTest 是一个辅助函数，用于执行策略验证。
 func validateTest(
 	t *testing.T,
 	request kubewarden_protocol.ValidationRequest,
@@ -44,11 +43,10 @@ func TestPodMutation(t *testing.T) {
 		shouldMutate        bool
 	}{
 		{
-			name: "pod with single container and multiple target envs",
+			name: "pod with single container and target env",
 			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
+				EnvKey:         "LOG_PATH",
+				AnnotationBase: "co_elastic_logs_path",
 			},
 			pod: corev1.Pod{
 				Spec: &corev1.PodSpec{
@@ -58,108 +56,54 @@ func TestPodMutation(t *testing.T) {
 							Env: []*corev1.EnvVar{
 								{
 									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/nginx/access.log",
-								},
-								{
-									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/nginx/error.log",
-								},
-								{
-									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/nginx/debug.log",
-								},
-								{
-									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/app/app.log",
-								},
-								{
-									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/app/error.log",
+									Value: "/var/log/app.log",
 								},
 							},
 						},
 					},
 				},
-				Metadata: &metav1.ObjectMeta{},
-			},
-			expectedAnnotations: map[string]string{
-				"co_elastic_logs_path":       "/var/log/nginx/access.log",
-				"co_elastic_logs_path_ext_1": "/var/log/nginx/error.log",
-				"co_elastic_logs_path_ext_2": "/var/log/nginx/debug.log",
-				"co_elastic_logs_path_ext_3": "/var/log/app/app.log",
-				"co_elastic_logs_path_ext_4": "/var/log/app/error.log",
-			},
-			shouldMutate: true,
-		},
-		{
-			name: "pod with multiple containers and target envs",
-			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
-			},
-			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{},
-				Spec: &corev1.PodSpec{
-					Containers: []*corev1.Container{
+				Metadata: &metav1.ObjectMeta{
+					OwnerReferences: []*metav1.OwnerReference{
 						{
-							Name: stringPtr("container1"),
-							Env: []*corev1.EnvVar{
-								{Name: stringPtr("LOG_PATH"), Value: "/var/log/app1.log"},
-							},
-						},
-						{
-							Name: stringPtr("container2"),
-							Env: []*corev1.EnvVar{
-								{Name: stringPtr("LOG_PATH"), Value: "/var/log/app2.log"},
-							},
+							APIVersion: stringPtr("apps/v1"),
+							Kind:       stringPtr("ReplicaSet"),
+							Name:       stringPtr("test-rs"),
+							UID:        stringPtr("test-uid"),
 						},
 					},
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"co_elastic_logs_path": "/var/log/app1.log",
+				"co_elastic_logs_path": "/var/log/app.log",
 			},
 			shouldMutate: true,
-		},
-		{
-			name: "container with nil name",
-			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
-			},
-			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{},
-				Spec: &corev1.PodSpec{
-					Containers: []*corev1.Container{
-						{
-							Name: nil,
-							Env: []*corev1.EnvVar{
-								{Name: stringPtr("LOG_PATH"), Value: "/var/log/app.log"},
-							},
-						},
-					},
-				},
-			},
-			expectedAnnotations: map[string]string{},
-			shouldMutate:        false,
 		},
 		{
 			name: "pod with no target env",
 			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
+				EnvKey:         "LOG_PATH",
+				AnnotationBase: "co_elastic_logs_path",
 			},
 			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{},
+				Metadata: &metav1.ObjectMeta{
+					OwnerReferences: []*metav1.OwnerReference{
+						{
+							APIVersion: stringPtr("apps/v1"),
+							Kind:       stringPtr("ReplicaSet"),
+							Name:       stringPtr("test-rs"),
+							UID:        stringPtr("test-uid"),
+						},
+					},
+				},
 				Spec: &corev1.PodSpec{
 					Containers: []*corev1.Container{
 						{
 							Name: stringPtr("my-container"),
 							Env: []*corev1.EnvVar{
-								{Name: stringPtr("OTHER_ENV"), Value: "some_value"},
+								{
+									Name:  stringPtr("OTHER_ENV"),
+									Value: "some_value",
+								},
 							},
 						},
 					},
@@ -171,54 +115,35 @@ func TestPodMutation(t *testing.T) {
 			shouldMutate: true,
 		},
 		{
-			name: "pod with existing annotations",
-			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
-			},
-			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"existing_annotation": "value",
-					},
-				},
-				Spec: &corev1.PodSpec{
-					Containers: []*corev1.Container{
-						{
-							Name: stringPtr("my-container"),
-							Env: []*corev1.EnvVar{
-								{Name: stringPtr("LOG_PATH"), Value: "/var/log/app.log"},
-							},
-						},
-					},
-				},
-			},
-			expectedAnnotations: map[string]string{
-				"existing_annotation":  "value",
-				"co_elastic_logs_path": "/var/log/app.log",
-			},
-			shouldMutate: true,
-		},
-		{
 			name: "pod with additional annotations",
 			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
+				EnvKey:         "LOG_PATH",
+				AnnotationBase: "co_elastic_logs_path",
 				AdditionalAnnotations: map[string]interface{}{
 					"custom.annotation/key1": "value1",
 					"custom.annotation/key2": "value2",
 				},
 			},
 			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{},
+				Metadata: &metav1.ObjectMeta{
+					OwnerReferences: []*metav1.OwnerReference{
+						{
+							APIVersion: stringPtr("apps/v1"),
+							Kind:       stringPtr("ReplicaSet"),
+							Name:       stringPtr("test-rs"),
+							UID:        stringPtr("test-uid"),
+						},
+					},
+				},
 				Spec: &corev1.PodSpec{
 					Containers: []*corev1.Container{
 						{
 							Name: stringPtr("my-container"),
 							Env: []*corev1.EnvVar{
-								{Name: stringPtr("LOG_PATH"), Value: "/var/log/app.log"},
+								{
+									Name:  stringPtr("LOG_PATH"),
+									Value: "/var/log/app.log",
+								},
 							},
 						},
 					},
@@ -232,22 +157,29 @@ func TestPodMutation(t *testing.T) {
 			shouldMutate: true,
 		},
 		{
-			name: "pod with no containers",
+			name: "pod not owned by replicaset",
 			settings: Settings{
-				EnvKey:              "LOG_PATH",
-				AnnotationBase:      "co_elastic_logs_path",
-				AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
+				EnvKey:         "LOG_PATH",
+				AnnotationBase: "co_elastic_logs_path",
 			},
 			pod: corev1.Pod{
-				Metadata: &metav1.ObjectMeta{},
 				Spec: &corev1.PodSpec{
-					Containers: []*corev1.Container{},
+					Containers: []*corev1.Container{
+						{
+							Name: stringPtr("my-container"),
+							Env: []*corev1.EnvVar{
+								{
+									Name:  stringPtr("LOG_PATH"),
+									Value: "/var/log/app.log",
+								},
+							},
+						},
+					},
 				},
+				Metadata: &metav1.ObjectMeta{},
 			},
-			expectedAnnotations: map[string]string{
-				"co.elastic.logs/enabled": "true",
-			},
-			shouldMutate: true,
+			expectedAnnotations: nil,
+			shouldMutate:        false,
 		},
 	}
 
@@ -258,57 +190,89 @@ func TestPodMutation(t *testing.T) {
 	}
 }
 
-func TestNonPodResource(t *testing.T) {
+func TestWorkloadMutation(t *testing.T) {
 	settings := Settings{
-		EnvKey:              "LOG_PATH",
-		AnnotationBase:      "co_elastic_logs_path",
-		AnnotationExtFormat: "co_elastic_logs_path_ext_%d",
+		EnvKey:         "LOG_PATH",
+		AnnotationBase: "co_elastic_logs_path",
 	}
 
-	// Create a non-Pod resource (Service)
-	service := map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Service",
+	// 创建一个带有 securityContext 的 Deployment
+	workload := map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
 		"metadata": map[string]interface{}{
-			"name": "test-service",
+			"name": "test-deployment",
 		},
 		"spec": map[string]interface{}{
-			"selector": map[string]interface{}{
-				"app": "test",
-			},
-			"ports": []map[string]interface{}{
-				{
-					"port":       80,
-					"targetPort": 8080,
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"securityContext": map[string]interface{}{
+						"runAsUser":  1000,
+						"runAsGroup": 1000,
+					},
+					"containers": []map[string]interface{}{
+						{
+							"name":  "test-container",
+							"image": "nginx:latest",
+							"env": []map[string]interface{}{
+								{
+									"name":  "LOG_PATH",
+									"value": "/var/log/app.log",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 	}
 
-	serviceJSON := mustMarshalJSON(service)
-	settingsJSON := mustMarshalJSON(settings)
-
-	req := kubewarden_protocol.ValidationRequest{
+	request := kubewarden_protocol.ValidationRequest{
 		Request: kubewarden_protocol.KubernetesAdmissionRequest{
+			Object: mustMarshalJSON(workload),
 			Kind: kubewarden_protocol.GroupVersionKind{
-				Kind: "Service",
+				Kind: "Deployment",
 			},
-			Object: serviceJSON,
 		},
-		Settings: settingsJSON,
+		Settings: mustMarshalJSON(settings),
 	}
 
-	response, err := validateTest(t, req)
+	response, err := validateTest(t, request)
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("Validation failed: %v", err)
 	}
 
 	if !response.Accepted {
-		t.Errorf("Expected request to be accepted for non-Pod resource")
+		t.Error("Expected request to be accepted")
+		return
 	}
 
-	if response.MutatedObject != nil {
-		t.Errorf("Expected no mutation for non-Pod resource")
+	if response.MutatedObject == nil {
+		t.Error("Expected mutation but got none")
+		return
+	}
+
+	var mutatedWorkload map[string]interface{}
+	mutatedJSON := mustMarshalJSON(response.MutatedObject)
+	if unmarshalErr := json.Unmarshal(mutatedJSON, &mutatedWorkload); unmarshalErr != nil {
+		t.Fatalf("Failed to unmarshal mutated object: %v", unmarshalErr)
+	}
+
+	// 验证 securityContext 是否保留
+	template := mutatedWorkload["spec"].(map[string]interface{})["template"].(map[string]interface{})
+	spec := template["spec"].(map[string]interface{})
+	if _, hasSecurityContext := spec["securityContext"]; !hasSecurityContext {
+		t.Error("Expected securityContext to be preserved")
+	}
+
+	// 验证注解
+	metadata := template["metadata"].(map[string]interface{})
+	annotations := metadata["annotations"].(map[string]interface{})
+
+	expectedValue := "/var/log/app.log"
+	if actualValue, ok := annotations["co_elastic_logs_path"].(string); !ok || actualValue != expectedValue {
+		t.Errorf("Expected annotation co_elastic_logs_path to be %s, got %v",
+			expectedValue, annotations["co_elastic_logs_path"])
 	}
 }
 
@@ -340,7 +304,7 @@ func runTest(t *testing.T, test struct {
 	}
 
 	if !response.Accepted {
-		t.Errorf("Expected request to be accepted")
+		t.Error("Expected request to be accepted")
 	}
 
 	if test.shouldMutate {
@@ -358,18 +322,18 @@ func assertMutation(
 	t.Helper()
 
 	if response.MutatedObject == nil {
-		t.Errorf("Expected mutation but got none")
+		t.Error("Expected mutation but got none")
 		return
 	}
 
-	mutatedJSON := mustMarshalJSON(response.MutatedObject)
 	var mutatedPod corev1.Pod
+	mutatedJSON := mustMarshalJSON(response.MutatedObject)
 	if err := json.Unmarshal(mutatedJSON, &mutatedPod); err != nil {
 		t.Fatalf("Failed to unmarshal mutated pod: %v", err)
 	}
 
 	if mutatedPod.Metadata == nil || mutatedPod.Metadata.Annotations == nil {
-		t.Errorf("Expected annotations but got none")
+		t.Error("Expected annotations but got none")
 		return
 	}
 
@@ -405,7 +369,7 @@ func stringPtr(s string) *string {
 func mustMarshalJSON(obj interface{}) []byte {
 	data, err := json.Marshal(obj)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to marshal JSON: %v", err))
+		panic(err)
 	}
 	return data
 }

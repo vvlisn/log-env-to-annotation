@@ -12,7 +12,15 @@
     },
     "object": {
         "metadata": {
-            "name": "nginx"
+            "name": "nginx",
+            "ownerReferences": [
+                {
+                    "apiVersion": "apps/v1",
+                    "kind": "ReplicaSet",
+                    "name": "nginx-rs",
+                    "uid": "5789b25d-9288-4c7c-9a23-3b1740a9e39d"
+                }
+            ]
         },
         "spec": {
             "containers": [

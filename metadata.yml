@@ -6,6 +6,31 @@ rules:
     operations:
       - CREATE
       - UPDATE
+  - apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources:
+      - "deployments"
+      - "replicasets"
+      - "statefulsets"
+      - "daemonsets"
+    operations:
+      - CREATE
+      - UPDATE
+  - apiGroups: ["batch"]
+    apiVersions: ["v1"]
+    resources:
+      - "jobs"
+      - "cronjobs"
+    operations:
+      - CREATE
+      - UPDATE
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources:
+      - "replicationcontrollers"
+    operations:
+      - CREATE
+      - UPDATE
 mutating: true
 contextAware: false
 executionMode: kubewarden-wapc

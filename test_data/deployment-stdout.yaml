@@ -18,14 +18,5 @@ spec:
       - name: my-container
         image: registry.cn-shenzhen.aliyuncs.com/vvlisn/nginx:latest
         env:
-        - name: vestack_varlog
+        - name: varlog
           value: /var/log/app.log
-        - name: vestack_varlog
-          value: /var/log/err.log
-        - name: vestack_varlog
-          value: /var/log/debug.log
-        - name: vestack_varlog
-          value: /var/log/war.log
-        securityContext:
-          privileged: false
-          runAsUser: 0
