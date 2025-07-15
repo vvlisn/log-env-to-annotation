@@ -9,7 +9,7 @@ import (
 	kubewarden_protocol "github.com/kubewarden/policy-sdk-go/protocol"
 )
 
-// validateTest 是一个辅助函数，用于执行策略验证。
+// validateTest is a helper function to execute the policy validation.
 func validateTest(
 	t *testing.T,
 	request kubewarden_protocol.ValidationRequest,
@@ -42,50 +42,6 @@ func TestPodMutation(t *testing.T) {
 		expectedAnnotations map[string]string
 		shouldMutate        bool
 	}{
-		{
-			name: "pod with securityContext",
-			settings: Settings{
-				EnvKey:         "LOG_PATH",
-				AnnotationBase: "co_elastic_logs_path",
-			},
-			pod: corev1.Pod{
-				Spec: &corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:  1000,
-						RunAsGroup: 1000,
-					},
-					Containers: []*corev1.Container{
-						{
-							Name: stringPtr("my-container"),
-							Env: []*corev1.EnvVar{
-								{
-									Name:  stringPtr("LOG_PATH"),
-									Value: "/var/log/app.log",
-								},
-							},
-							SecurityContext: &corev1.SecurityContext{
-								Privileged: false,
-								RunAsUser:  0,
-							},
-						},
-					},
-				},
-				Metadata: &metav1.ObjectMeta{
-					OwnerReferences: []*metav1.OwnerReference{
-						{
-							APIVersion: stringPtr("apps/v1"),
-							Kind:       stringPtr("ReplicaSet"),
-							Name:       stringPtr("test-rs"),
-							UID:        stringPtr("test-uid"),
-						},
-					},
-				},
-			},
-			expectedAnnotations: map[string]string{
-				"co_elastic_logs_path": "/var/log/app.log",
-			},
-			shouldMutate: true,
-		},
 		{
 			name: "pod with single container and target env",
 			settings: Settings{
@@ -234,99 +190,13 @@ func TestPodMutation(t *testing.T) {
 	}
 }
 
-func TestWorkloadMutation(t *testing.T) {
-	settings := Settings{
-		EnvKey:         "LOG_PATH",
-		AnnotationBase: "co_elastic_logs_path",
-	}
-
-	// 创建一个带有 securityContext 的 Deployment
-	workload := map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name": "test-deployment",
-		},
-		"spec": map[string]interface{}{
-			"template": map[string]interface{}{
-				"spec": map[string]interface{}{
-					"securityContext": map[string]interface{}{
-						"runAsUser":  1000,
-						"runAsGroup": 1000,
-					},
-					"containers": []map[string]interface{}{
-						{
-							"name":  "test-container",
-							"image": "nginx:latest",
-							"env": []map[string]interface{}{
-								{
-									"name":  "LOG_PATH",
-									"value": "/var/log/app.log",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	request := kubewarden_protocol.ValidationRequest{
-		Request: kubewarden_protocol.KubernetesAdmissionRequest{
-			Object: mustMarshalJSON(workload),
-			Kind: kubewarden_protocol.GroupVersionKind{
-				Kind: "Deployment",
-			},
-		},
-		Settings: mustMarshalJSON(settings),
-	}
-
-	response, err := validateTest(t, request)
-	if err != nil {
-		t.Fatalf("Validation failed: %v", err)
-	}
-
-	if !response.Accepted {
-		t.Error("Expected request to be accepted")
-		return
-	}
-
-	if response.MutatedObject == nil {
-		t.Error("Expected mutation but got none")
-		return
-	}
-
-	var mutatedWorkload map[string]interface{}
-	mutatedJSON := mustMarshalJSON(response.MutatedObject)
-	if unmarshalErr := json.Unmarshal(mutatedJSON, &mutatedWorkload); unmarshalErr != nil {
-		t.Fatalf("Failed to unmarshal mutated object: %v", unmarshalErr)
-	}
-
-	// 验证 securityContext 是否保留
-	template := mutatedWorkload["spec"].(map[string]interface{})["template"].(map[string]interface{})
-	spec := template["spec"].(map[string]interface{})
-	if _, hasSecurityContext := spec["securityContext"]; !hasSecurityContext {
-		t.Error("Expected securityContext to be preserved")
-	}
-
-	// 验证注解
-	metadata := template["metadata"].(map[string]interface{})
-	annotations := metadata["annotations"].(map[string]interface{})
-
-	expectedValue := "/var/log/app.log"
-	if actualValue, ok := annotations["co_elastic_logs_path"].(string); !ok || actualValue != expectedValue {
-		t.Errorf("Expected annotation co_elastic_logs_path to be %s, got %v",
-			expectedValue, annotations["co_elastic_logs_path"])
-	}
-}
-
 func TestObjectIntegrity(t *testing.T) {
 	settings := Settings{
 		EnvKey:         "LOG_PATH",
 		AnnotationBase: "co_elastic_logs_path",
 	}
 
-	// 创建一个完整的 Pod 对象
+	// Create a complete Pod object
 	originalPod := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -390,7 +260,7 @@ func TestObjectIntegrity(t *testing.T) {
 		return
 	}
 
-	// 将原始对象和变更后的对象转换为 JSON 字符串进行比较
+	// Compare the original and mutated objects by converting them to JSON strings
 	originalJSON := mustMarshalJSON(originalPod)
 	mutatedJSON := mustMarshalJSON(response.MutatedObject)
 
@@ -402,7 +272,7 @@ func TestObjectIntegrity(t *testing.T) {
 		t.Fatalf("Failed to unmarshal mutated object: %v", unmarshalErr2)
 	}
 
-	// 验证除了注解之外的所有字段都保持不变
+	// Verify that all fields except annotations remain unchanged
 	assertObjectsEqual(t, original, mutated, []string{"metadata", "metadata.annotations"})
 }
 

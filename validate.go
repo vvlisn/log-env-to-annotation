@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	// LogEnabledAnnotation 是启用日志收集的注解键。
+	// LogEnabledAnnotation is the annotation key to enable log collection.
 	LogEnabledAnnotation = "co.elastic.logs/enabled"
-	// LogEnabledValue 是启用日志收集的注解值。
+	// LogEnabledValue is the annotation value to enable log collection.
 	LogEnabledValue = "true"
-	// RejectCode 是拒绝请求时使用的状态码。
+	// RejectCode is the status code used when rejecting a request.
 	RejectCode = 400
 )
 
-// validate 是策略的入口函数。
+// validate is the entry point of the policy.
 func validate(payload []byte) ([]byte, error) {
 	var validationRequest kubewarden_protocol.ValidationRequest
 	if err := json.Unmarshal(payload, &validationRequest); err != nil {
@@ -43,7 +43,7 @@ func validate(payload []byte) ([]byte, error) {
 	}
 }
 
-// checkEnvVars 检查容器的环境变量并返回日志路径。
+// checkEnvVars checks the environment variables of a container and returns the log paths.
 func checkEnvVars(container **corev1.Container, envKey string) []string {
 	if container == nil || *container == nil {
 		return nil
@@ -58,15 +58,15 @@ func checkEnvVars(container **corev1.Container, envKey string) []string {
 	return logPaths
 }
 
-// getAnnotations 根据日志路径和设置生成注解。
+// getAnnotations generates annotations based on log paths and settings.
 func getAnnotations(logPaths []string, settings Settings) map[string]string {
 	annotations := make(map[string]string)
 
 	if len(logPaths) > 0 {
-		// 设置基础注解
+		// Set base annotation
 		annotations[settings.AnnotationBase] = logPaths[0]
 
-		// 设置扩展注解
+		// Set extended annotations
 		if len(logPaths) > 1 && settings.AnnotationExtFormat != "" {
 			for i, path := range logPaths[1:] {
 				extKey := fmt.Sprintf(settings.AnnotationExtFormat, i+1)
@@ -77,7 +77,7 @@ func getAnnotations(logPaths []string, settings Settings) map[string]string {
 		annotations[LogEnabledAnnotation] = LogEnabledValue
 	}
 
-	// 添加额外的注解
+	// Add additional annotations
 	for key, value := range settings.AdditionalAnnotations {
 		if value != nil {
 			annotations[key] = convertToString(value)
@@ -87,13 +87,13 @@ func getAnnotations(logPaths []string, settings Settings) map[string]string {
 	return annotations
 }
 
-// isDeploymentPod 检查 Pod 是否由 Deployment 创建。
+// isDeploymentPod checks if a Pod was created by a Deployment.
 func isDeploymentPod(pod *corev1.Pod) bool {
 	if pod.Metadata == nil || len(pod.Metadata.OwnerReferences) == 0 {
 		return false
 	}
 
-	// 检查是否由 ReplicaSet 创建
+	// Check if it was created by a ReplicaSet
 	for _, owner := range pod.Metadata.OwnerReferences {
 		if owner != nil && *owner.Kind == "ReplicaSet" {
 			return true
@@ -102,35 +102,35 @@ func isDeploymentPod(pod *corev1.Pod) bool {
 	return false
 }
 
-// handlePod 处理 Pod 资源的验证和变更。
+// handlePod handles the validation and mutation of Pod resources.
 func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings) ([]byte, error) {
-	// 解析原始对象
+	// Unmarshal the original object
 	var rawObj map[string]interface{}
 	if err := json.Unmarshal(request.Request.Object, &rawObj); err != nil {
 		return kubewarden.RejectRequest(kubewarden.Message(err.Error()), kubewarden.Code(RejectCode))
 	}
 
-	// 解析为 Pod 对象以便检查
+	// Unmarshal to a Pod object for checking
 	var pod corev1.Pod
 	if err := json.Unmarshal(request.Request.Object, &pod); err != nil {
 		return kubewarden.RejectRequest(kubewarden.Message(err.Error()), kubewarden.Code(RejectCode))
 	}
 
-	// 只处理由 Deployment 创建的 Pod
+	// Only handle Pods created by a Deployment
 	if !isDeploymentPod(&pod) {
 		return kubewarden.AcceptRequest()
 	}
 
-	// 检查第一个容器的环境变量
+	// Check the environment variables of the first container
 	var logPaths []string
 	if len(pod.Spec.Containers) > 0 {
 		logPaths = checkEnvVars(&pod.Spec.Containers[0], settings.EnvKey)
 	}
 
-	// 生成注解
+	// Generate annotations
 	annotations := getAnnotations(logPaths, settings)
 
-	// 更新原始对象的注解
+	// Update the annotations of the original object
 	metadata, ok := rawObj["metadata"].(map[string]interface{})
 	if !ok {
 		metadata = make(map[string]interface{})
@@ -142,7 +142,7 @@ func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings)
 		existingAnnotations = make(map[string]interface{})
 	}
 
-	// 合并注解
+	// Merge annotations
 	for k, v := range annotations {
 		existingAnnotations[k] = v
 	}
@@ -151,15 +151,15 @@ func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings)
 	return kubewarden.MutateRequest(rawObj)
 }
 
-// handleDeployment 处理 Deployment 资源的验证和变更。
+// handleDeployment handles the validation and mutation of Deployment resources.
 func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Settings) ([]byte, error) {
-	// 解析原始对象
+	// Unmarshal the original object
 	var rawObj map[string]interface{}
 	if err := json.Unmarshal(request.Request.Object, &rawObj); err != nil {
 		return kubewarden.RejectRequest(kubewarden.Message(err.Error()), kubewarden.Code(RejectCode))
 	}
 
-	// 解析为 Deployment 对象以便检查
+	// Unmarshal to a Deployment object for checking
 	var deployment appsv1.Deployment
 	if err := json.Unmarshal(request.Request.Object, &deployment); err != nil {
 		return kubewarden.RejectRequest(kubewarden.Message(err.Error()), kubewarden.Code(RejectCode))
@@ -169,16 +169,16 @@ func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Se
 		return kubewarden.AcceptRequest()
 	}
 
-	// 检查第一个容器的环境变量
+	// Check the environment variables of the first container
 	var logPaths []string
 	if len(deployment.Spec.Template.Spec.Containers) > 0 {
 		logPaths = checkEnvVars(&deployment.Spec.Template.Spec.Containers[0], settings.EnvKey)
 	}
 
-	// 生成注解
+	// Generate annotations
 	annotations := getAnnotations(logPaths, settings)
 
-	// 更新原始对象的注解
+	// Update the annotations of the original object
 	spec, ok := rawObj["spec"].(map[string]interface{})
 	if !ok {
 		return kubewarden.RejectRequest(kubewarden.Message("Invalid deployment spec"), kubewarden.Code(RejectCode))
@@ -200,7 +200,7 @@ func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Se
 		existingAnnotations = make(map[string]interface{})
 	}
 
-	// 合并注解
+	// Merge annotations
 	for k, v := range annotations {
 		existingAnnotations[k] = v
 	}
@@ -209,7 +209,7 @@ func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Se
 	return kubewarden.MutateRequest(rawObj)
 }
 
-// convertToString 将任意类型转换为字符串。
+// convertToString converts any type to a string.
 func convertToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:
