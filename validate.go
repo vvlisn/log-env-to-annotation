@@ -44,14 +44,14 @@ func validate(payload []byte) ([]byte, error) {
 }
 
 // checkEnvVars checks the environment variables of a container and returns the log paths.
-func checkEnvVars(container **corev1.Container, envKey string) []string {
-	if container == nil || *container == nil {
+func checkEnvVars(container *corev1.Container, envKey string) []string {
+	if container == nil {
 		return nil
 	}
 
 	var logPaths []string
-	for _, env := range (*container).Env {
-		if env != nil && env.Name != nil && *env.Name == envKey {
+	for _, env := range container.Env {
+		if env.Name != nil && *env.Name == envKey {
 			logPaths = append(logPaths, env.Value)
 		}
 	}
@@ -102,6 +102,20 @@ func isDeploymentPod(pod *corev1.Pod) bool {
 	return false
 }
 
+// updateAnnotations updates the annotations in a metadata map.
+func updateAnnotations(metadata map[string]interface{}, annotations map[string]string) {
+	existingAnnotations, ok := metadata["annotations"].(map[string]interface{})
+	if !ok {
+		existingAnnotations = make(map[string]interface{})
+	}
+
+	// Merge annotations
+	for k, v := range annotations {
+		existingAnnotations[k] = v
+	}
+	metadata["annotations"] = existingAnnotations
+}
+
 // handlePod handles the validation and mutation of Pod resources.
 func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings) ([]byte, error) {
 	// Unmarshal the original object
@@ -124,7 +138,7 @@ func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings)
 	// Check the environment variables of the first container
 	var logPaths []string
 	if len(pod.Spec.Containers) > 0 {
-		logPaths = checkEnvVars(&pod.Spec.Containers[0], settings.EnvKey)
+		logPaths = checkEnvVars(pod.Spec.Containers[0], settings.EnvKey)
 	}
 
 	// Generate annotations
@@ -136,17 +150,7 @@ func handlePod(request kubewarden_protocol.ValidationRequest, settings Settings)
 		metadata = make(map[string]interface{})
 		rawObj["metadata"] = metadata
 	}
-
-	existingAnnotations, ok := metadata["annotations"].(map[string]interface{})
-	if !ok {
-		existingAnnotations = make(map[string]interface{})
-	}
-
-	// Merge annotations
-	for k, v := range annotations {
-		existingAnnotations[k] = v
-	}
-	metadata["annotations"] = existingAnnotations
+	updateAnnotations(metadata, annotations)
 
 	return kubewarden.MutateRequest(rawObj)
 }
@@ -172,7 +176,7 @@ func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Se
 	// Check the environment variables of the first container
 	var logPaths []string
 	if len(deployment.Spec.Template.Spec.Containers) > 0 {
-		logPaths = checkEnvVars(&deployment.Spec.Template.Spec.Containers[0], settings.EnvKey)
+		logPaths = checkEnvVars(deployment.Spec.Template.Spec.Containers[0], settings.EnvKey)
 	}
 
 	// Generate annotations
@@ -194,17 +198,7 @@ func handleDeployment(request kubewarden_protocol.ValidationRequest, settings Se
 		metadata = make(map[string]interface{})
 		template["metadata"] = metadata
 	}
-
-	existingAnnotations, ok := metadata["annotations"].(map[string]interface{})
-	if !ok {
-		existingAnnotations = make(map[string]interface{})
-	}
-
-	// Merge annotations
-	for k, v := range annotations {
-		existingAnnotations[k] = v
-	}
-	metadata["annotations"] = existingAnnotations
+	updateAnnotations(metadata, annotations)
 
 	return kubewarden.MutateRequest(rawObj)
 }
@@ -219,7 +213,7 @@ func convertToString(value interface{}) string {
 	case int, int32, int64:
 		return fmt.Sprintf("%d", v)
 	case float32, float64:
-		return fmt.Sprintf("%f", v)
+		return fmt.Sprintf("%g", v)
 	default:
 		return fmt.Sprintf("%v", v)
 	}
