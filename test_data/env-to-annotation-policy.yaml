@@ -3,11 +3,17 @@ kind: ClusterAdmissionPolicy
 metadata:
   name: log-env-to-annotation
 spec:
-  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:v1.0.1
+  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:latest
   rules:
   - apiGroups: [""]
     apiVersions: ["v1"]
     resources: ["pods"]
+    operations:
+    - CREATE
+    - UPDATE
+  - apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments", "replicasets"]
     operations:
     - CREATE
     - UPDATE
