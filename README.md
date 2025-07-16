@@ -2,11 +2,11 @@
 
 # env-to-annotation-policy
 
-This policy converts specific container environment variables into pod annotations.
+This policy converts specific container environment variables into pod annotations for Deployments and their Pods.
 
 ## Introduction
 
-This repository contains a Kubewarden policy written in Go. This policy is designed to convert container environment variables into Pod annotations, primarily to facilitate integration with logging systems. By dynamically adding annotations based on environment variables, it allows log collectors to discover and process application logs more effectively.
+This repository contains a Kubewarden policy written in Go. This policy is designed to convert container environment variables into Pod annotations for Deployments and their Pods, primarily to facilitate integration with logging systems. By dynamically adding annotations based on environment variables, it allows log collectors to discover and process application logs more effectively.
 
 The policy is configurable via runtime settings.
 
@@ -21,7 +21,8 @@ You can configure the policy using a JSON structure. When using `kwctl run --set
       "annotation_ext_format": "my.company.com/log-path-ext-%d",
       "additional_annotations": {
         "example.com/key1": "value1",
-        "example.com/key2": "value2"
+        "example.com/key2": true,
+        "example.com/key3": 123
       }
     }
   ]
@@ -35,10 +36,11 @@ When deploying the policy to a Kubewarden cluster, the settings are typically pr
   "env_key": "MY_LOG_PATH_ENV",
   "annotation_base": "my.company.com/log-path",
   "annotation_ext_format": "my.company.com/log-path-ext-%d",
-  "additional_annotations": {
-    "example.com/key1": "value1",
-    "example.com/key2": "value2"
-  }
+      "additional_annotations": {
+        "example.com/key1": "value1",
+        "example.com/key2": true,
+        "example.com/key3": 123
+      }
 }
 ```
 
@@ -46,7 +48,7 @@ The available settings are:
 - `env_key` (string, mandatory): The name of the container environment variable whose value will be converted into an annotation.
 - `annotation_base` (string, mandatory): The base annotation key name. The value of `env_key` will be assigned to this annotation. If `env_key` contains multiple paths separated by commas, the first path will be assigned to this base annotation.
 - `annotation_ext_format` (string, mandatory): The format string for extended annotation keys. If `env_key` contains multiple paths, subsequent paths will be assigned to annotations generated using this format. The string must contain `%d`, which will be replaced by sequence numbers (1, 2, 3...). Example: `my.company.com/log-path-ext-%d`.
-- `additional_annotations` (map[string]string, optional): Custom key-value pairs to add as annotations. Both keys and values must be non-empty strings. This parameter is optional and can be omitted if not needed.
+- `additional_annotations` (map[string]interface{}, optional): Custom key-value pairs to add as annotations. Keys must be non-empty strings. Values can be of any type (string, boolean, number). This parameter is optional and can be omitted if not needed.
 
 ## Code organization
 
@@ -81,7 +83,7 @@ This policy utilizes several key concepts in its implementation:
    - Implements Kubewarden policy interface:
      - `validate`: Main entry point for Pod mutation.
      - `validate_settings`: Entry point for settings validation.
-   - Only processes the first container in each Pod.
+   - Processes containers in Pods, Deployments, and ReplicaSets.
 
 See the [Kubewarden Policy SDK](https://github.com/kubewarden/policy-sdk-go) documentation for more details on policy development.
 
@@ -131,11 +133,17 @@ kind: ClusterAdmissionPolicy
 metadata:
   name: log-env-to-annotation
 spec:
-  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:v1.0.0
+  module: registry://ghcr.io/vvlisn/policies/log-env-to-annotation:v1.1.0
   rules:
   - apiGroups: [""]
     apiVersions: ["v1"]
     resources: ["pods"]
+    operations:
+    - CREATE
+    - UPDATE
+  - apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments", "replicasets"]
     operations:
     - CREATE
     - UPDATE

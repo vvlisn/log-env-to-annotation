@@ -18,7 +18,10 @@ const (
 	// LogEnabledValue is the annotation value to enable log collection.
 	LogEnabledValue = "true"
 	// RejectCode is the status code used when rejecting a request.
-	RejectCode = 400
+	RejectCode      = 400
+	DEPLOYMENT_KIND = "deployment"
+	REPLICASET_KIND = "ReplicaSet"
+	POD_KIND        = "pod"
 )
 
 // validate is the entry point of the policy.
@@ -34,9 +37,9 @@ func validate(payload []byte) ([]byte, error) {
 	}
 
 	switch strings.ToLower(validationRequest.Request.Kind.Kind) {
-	case "pod":
+	case POD_KIND:
 		return handlePod(validationRequest, settings)
-	case "deployment":
+	case DEPLOYMENT_KIND:
 		return handleDeployment(validationRequest, settings)
 	default:
 		return kubewarden.AcceptRequest()
@@ -95,7 +98,7 @@ func isDeploymentPod(pod *corev1.Pod) bool {
 
 	// Check if it was created by a ReplicaSet
 	for _, owner := range pod.Metadata.OwnerReferences {
-		if owner != nil && *owner.Kind == "ReplicaSet" {
+		if owner != nil && *owner.Kind == REPLICASET_KIND {
 			return true
 		}
 	}
